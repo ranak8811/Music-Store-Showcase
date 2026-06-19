@@ -19,6 +19,54 @@ const REVIEW_TEMPLATES = {
   ],
 };
 
+// Lyrics Template Data
+const LYRICS_TEMPLATES = {
+  en: {
+    verses: [
+      [
+        "Walking down the digital line",
+        "Frequencies are aligned in time",
+        "A sound that makes you feel alive",
+        "We generate until the dawn",
+      ],
+      [
+        "Rhythms beating in my head",
+        "Synthesizers glowing bright",
+        "No database, just memory",
+        "Deterministic beat goes on",
+      ],
+      [
+        "Coded nights and electronic dreams",
+        "Searching for the perfect seed",
+        "Melodies floating in the air",
+        "Echoes of the sound we share",
+      ],
+    ],
+  },
+  de: {
+    verses: [
+      [
+        "Ich gehe den digitalen Weg",
+        "Frequenzen sind zeitlich abgestimmt",
+        "Ein Sound, der dich lebendig fühlen lässt",
+        "Wir generieren bis zum Morgengrauen",
+      ],
+      [
+        "Rhythmen schlagen in meinem Kopf",
+        "Synthesizer leuchten hell",
+        "Keine Datenbank, nur Speicher",
+        "Der deterministische Takt geht weiter",
+      ],
+      [
+        "Codierte Nächte und elektronische Träume",
+        "Auf der Suche nach dem perfekten Samen",
+        "Melodien schweben in der Luft",
+        "Echostimmen des Klangs, den wir teilen",
+      ],
+    ],
+  },
+};
+
 // Musical Scale Configuration (Pitches in MIDI values)
 const SCALES = {
   major: [60, 62, 64, 65, 67, 69, 71, 72], // C Major
@@ -167,6 +215,26 @@ const generateMusicTrack = (rng) => {
   };
 };
 
+const generateLyrics = (locale, rng) => {
+  const templates = LYRICS_TEMPLATES[locale] || LYRICS_TEMPLATES.en;
+  const verseIndex = Math.floor(rng() * templates.verses.length);
+  const selectedVerse = templates.verses[verseIndex];
+
+  // Map each line of the verse to a specific beat time (4 beats per bar)
+  // bar 0 = beat 0, bar 1 = beat 4, bar 2 = beat 8, bar 3 = beat 12
+  return [
+    {
+      time: 0,
+      text: `🎵 [Intro - Synth ${selectedVerse[0].split(" ")[0]}...]`,
+    },
+    { time: 2, text: selectedVerse[0] },
+    { time: 6, text: selectedVerse[1] },
+    { time: 10, text: selectedVerse[2] },
+    { time: 14, text: selectedVerse[3] },
+    { time: 16.5, text: "🎵 [Outro]" },
+  ];
+};
+
 export const generateSongsPage = (
   globalSeed,
   page,
@@ -204,6 +272,8 @@ export const generateSongsPage = (
 
     const musicTrack = generateMusicTrack(metaRng);
 
+    const lyrics = generateLyrics(locale, metaRng);
+
     const likesSeed = `${globalSeed}_${absoluteIndex}_likes`;
     const likesRng = seedrandom(likesSeed);
     const likes = calculateLikes(likesRng, likesAverage);
@@ -217,6 +287,7 @@ export const generateSongsPage = (
       reviewText,
       coverSvg,
       musicTrack,
+      lyrics,
       likes,
     });
   }
