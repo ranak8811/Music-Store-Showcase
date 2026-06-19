@@ -1,3 +1,5 @@
+import React from "react";
+
 const Toolbar = ({
   locale,
   setLocale,
@@ -5,13 +7,17 @@ const Toolbar = ({
   setSeed,
   likes,
   setLikes,
+  likesInput,
+  setLikesInput,
+  likesError,
+  setLikesError,
   viewMode,
   setViewMode,
   generateRandomSeed,
 }) => {
   return (
     <div className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-wrap gap-6 items-center justify-between shadow-lg">
-      {/* View Mode Switcher */}
+      {/* Display Mode Selection */}
       <div className="flex flex-col gap-1.5 min-w-[150px]">
         <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
           Display Mode
@@ -77,23 +83,69 @@ const Toolbar = ({
         </div>
       </div>
 
-      {/* Likes Per Song Control */}
-      <div className="flex flex-col gap-1.5 min-w-[180px] flex-1">
+      {/* Likes Per Song - Advanced Validation Controls */}
+      <div className="flex flex-col gap-1.5 min-w-[240px] flex-1">
         <div className="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider">
           <span>Likes per Song</span>
-          <span className="text-violet-400 font-bold normal-case text-sm">
-            {likes}
-          </span>
+          {likesError ? (
+            <span className="text-red-400 font-bold lowercase text-xs animate-pulse">
+              ⚠️ {likesError}
+            </span>
+          ) : (
+            <span className="text-violet-400 font-bold normal-case text-sm">
+              {likes}
+            </span>
+          )}
         </div>
+
         <div className="flex items-center gap-3">
+          {/* Slider: bounded by safe values */}
           <input
             type="range"
             min="0"
             max="10"
             step="0.1"
-            value={likes}
-            onChange={(e) => setLikes(parseFloat(e.target.value))}
+            value={likesError ? 0 : likes}
+            onChange={(e) => {
+              const val = parseFloat(e.target.value);
+              setLikes(val);
+              setLikesInput(e.target.value);
+              setLikesError(""); // Clear errors when slider changes
+            }}
             className="flex-1 accent-violet-600 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer"
+          />
+
+          {/* Precision Input Box: handles custom typing */}
+          <input
+            type="text"
+            value={likesInput}
+            onChange={(e) => {
+              const valString = e.target.value;
+              setLikesInput(valString);
+
+              // 1. Check if blank
+              if (valString.trim() === "") {
+                setLikesError("Cannot be blank");
+                return;
+              }
+
+              // 2. Parse and validate number
+              const num = parseFloat(valString);
+              if (isNaN(num)) {
+                setLikesError("Must be a number");
+              } else if (num < 0 || num > 10) {
+                setLikesError("Must be 0 to 10");
+              } else {
+                // Clear errors and propagate state
+                setLikesError("");
+                setLikes(num);
+              }
+            }}
+            className={`w-14 bg-slate-950 text-slate-100 border rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none transition-colors ${
+              likesError
+                ? "border-red-500 focus:border-red-500"
+                : "border-slate-750 focus:border-violet-500"
+            }`}
           />
         </div>
       </div>

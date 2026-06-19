@@ -1,24 +1,35 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import api from './utils/api';
-import { playMelody, pauseMelody, stopMelody, setVolume, changeSynthType } from './utils/audio';
-import Toolbar from './components/Toolbar';
-import TableView from './components/TableView';
-import GalleryView from './components/GalleryView';
-import PlayerBar from './components/PlayerBar';
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import api from "./utils/api";
+import {
+  playMelody,
+  pauseMelody,
+  stopMelody,
+  setVolume,
+  changeSynthType,
+} from "./utils/audio";
+import Toolbar from "./components/Toolbar";
+import TableView from "./components/TableView";
+import GalleryView from "./components/GalleryView";
+import PlayerBar from "./components/PlayerBar";
 
 const App = () => {
-  // 1. Core States for Toolbar
-  const [locale, setLocale] = useState('en');
-  const [seed, setSeed] = useState('42');
-  const [likes, setLikes] = useState(3.7);
-  const [viewMode, setViewMode] = useState('table'); // 'table' or 'gallery'
+  // 1. Toolbar State
+  const [locale, setLocale] = useState("en");
+  const [seed, setSeed] = useState("42");
 
-  // 2. Pagination States
+  // Advanced Likes Input Validation States
+  const [likes, setLikes] = useState(3.7);
+  const [likesInput, setLikesInput] = useState("3.7");
+  const [likesError, setLikesError] = useState("");
+
+  const [viewMode, setViewMode] = useState("table");
+
+  // 2. Pagination State
   const [page, setPage] = useState(1);
   const [songs, setSongs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   // 3. Audio Player Master States
   const [activeSong, setActiveSong] = useState(null);
@@ -26,9 +37,9 @@ const App = () => {
   const [audioProgress, setAudioProgress] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
   const [volume, setVolumeState] = useState(0.5);
-  const [synth, setSynthState] = useState('sine');
+  const [synth, setSynthState] = useState("sine");
 
-  // 4. Set row expansion for Table View
+  // 4. Set row expansion
   const [expandedRows, setExpandedRows] = useState(new Set());
 
   // 5. DOM References
@@ -61,38 +72,45 @@ const App = () => {
     };
   }, []);
 
-  // API Call Orchestration
-  const loadSongs = useCallback(async (targetPage, shouldAppend) => {
-    if (targetPage === 1) {
-      setLoading(true);
-    } else {
-      setLoadingMore(true);
-    }
-    setError('');
+  // Fetch API Controller
+  const loadSongs = useCallback(
+    async (targetPage, shouldAppend) => {
+      if (targetPage === 1) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
+      setError("");
 
-    try {
-      const response = await api.get('/songs', {
-        params: { seed, page: targetPage, locale, likes }
-      });
-      const newSongs = response.data.songs;
-      setSongs((prev) => shouldAppend ? [...prev, ...newSongs] : newSongs);
-    } catch (err) {
-      console.error(err);
-      setError('Failed to load songs from server. Make sure backend is running.');
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }, [seed, locale, likes]);
+      try {
+        const response = await api.get("/songs", {
+          params: { seed, page: targetPage, locale, likes },
+        });
+        const newSongs = response.data.songs;
+        setSongs((prev) => (shouldAppend ? [...prev, ...newSongs] : newSongs));
+      } catch (err) {
+        console.error(err);
+        setError(
+          "Failed to load songs from server. Make sure backend is running.",
+        );
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [seed, locale, likes],
+  );
 
-  // Reset to Page 1 when search options change
+  // Sync inputs and trigger API calls ONLY if validation passes
   useEffect(() => {
+    if (likesError) return; // LOCK API: Prevent fetch requests with invalid inputs!
+
     setPage(1);
     stopActiveAudio();
     setExpandedRows(new Set());
     loadSongs(1, false);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [seed, locale, likes, viewMode]);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [seed, locale, likes, viewMode, likesError]);
 
   // Clean up audio on page exit
   useEffect(() => {
@@ -116,7 +134,7 @@ const App = () => {
     return activeIndex;
   };
 
-  // Auto Scroll Synchronized Lyrics panel
+  // Auto Scroll Lyrics
   useEffect(() => {
     if (!activeSong) return;
     const activeIdx = getActiveLyricsIndex(activeSong, audioProgress);
@@ -127,8 +145,11 @@ const App = () => {
       const activeLineEl = container.children[activeIdx];
       if (activeLineEl) {
         container.scrollTo({
-          top: activeLineEl.offsetTop - container.clientHeight / 2 + activeLineEl.clientHeight / 2,
-          behavior: 'smooth'
+          top:
+            activeLineEl.offsetTop -
+            container.clientHeight / 2 +
+            activeLineEl.clientHeight / 2,
+          behavior: "smooth",
         });
       }
     }
@@ -141,15 +162,25 @@ const App = () => {
         pauseMelody();
         setIsPlaying(false);
       } else {
-        playMelody(song.musicTrack, audioProgress, window.__audioProgressCb, window.__audioFinishedCb);
+        playMelody(
+          song.musicTrack,
+          audioProgress,
+          window.__audioProgressCb,
+          window.__audioFinishedCb,
+        );
         setVolume(volume);
         setIsPlaying(true);
       }
     } else {
       stopActiveAudio();
       setActiveSong(song);
-      setSynthState(song.musicTrack.synthType || 'sine');
-      playMelody(song.musicTrack, 0, window.__audioProgressCb, window.__audioFinishedCb);
+      setSynthState(song.musicTrack.synthType || "sine");
+      playMelody(
+        song.musicTrack,
+        0,
+        window.__audioProgressCb,
+        window.__audioFinishedCb,
+      );
       setVolume(volume);
       setIsPlaying(true);
     }
@@ -160,7 +191,12 @@ const App = () => {
     if (!activeSong) return;
     const newOffset = parseFloat(e.target.value);
     setAudioProgress(newOffset);
-    playMelody(activeSong.musicTrack, newOffset, window.__audioProgressCb, window.__audioFinishedCb);
+    playMelody(
+      activeSong.musicTrack,
+      newOffset,
+      window.__audioProgressCb,
+      window.__audioFinishedCb,
+    );
     setVolume(volume);
     setIsPlaying(true);
   };
@@ -180,7 +216,7 @@ const App = () => {
   const handlePageChange = (newPage) => {
     setPage(newPage);
     loadSongs(newPage, false);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const toggleRow = (index) => {
@@ -193,33 +229,39 @@ const App = () => {
     setExpandedRows(newExpandedRows);
   };
 
+  // Sync state update inside callback
   const generateRandomSeed = useCallback(() => {
-    const randomSeedVal = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString();
+    const randomSeedVal = Math.floor(
+      Math.random() * Number.MAX_SAFE_INTEGER,
+    ).toString();
     setSeed(randomSeedVal);
   }, []);
 
   const formatTime = (sec) => {
     const mins = Math.floor(sec / 60);
     const secs = Math.floor(sec % 60);
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
   // Infinite Scroll Trigger (Gallery Mode)
   useEffect(() => {
-    if (viewMode !== 'gallery' || loading || loadingMore) return;
+    if (viewMode !== "gallery" || loading || loadingMore || likesError) return; // Prevent load more on error
 
-    const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting) {
-        setPage((prevPage) => {
-          const nextPage = prevPage + 1;
-          loadSongs(nextPage, true);
-          return nextPage;
-        });
-      }
-    }, {
-      rootMargin: '120px',
-      threshold: 0.1
-    });
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setPage((prevPage) => {
+            const nextPage = prevPage + 1;
+            loadSongs(nextPage, true);
+            return nextPage;
+          });
+        }
+      },
+      {
+        rootMargin: "120px",
+        threshold: 0.1,
+      },
+    );
 
     const currentTrigger = loadMoreRef.current;
     if (currentTrigger) {
@@ -231,12 +273,11 @@ const App = () => {
         observer.unobserve(currentTrigger);
       }
     };
-  }, [viewMode, loading, loadingMore, loadSongs]);
+  }, [viewMode, loading, loadingMore, loadSongs, likesError]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col items-center p-6 pb-36">
       <div className="w-full max-w-5xl flex flex-col gap-6">
-        
         {/* Header */}
         <header className="text-center mt-4">
           <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent sm:text-5xl">
@@ -247,14 +288,18 @@ const App = () => {
           </p>
         </header>
 
-        {/* Toolbar Component */}
-        <Toolbar 
-          locale={locale} 
+        {/* Toolbar */}
+        <Toolbar
+          locale={locale}
           setLocale={setLocale}
-          seed={seed} 
+          seed={seed}
           setSeed={setSeed}
-          likes={likes} 
+          likes={likes}
           setLikes={setLikes}
+          likesInput={likesInput}
+          setLikesInput={setLikesInput}
+          likesError={likesError}
+          setLikesError={setLikesError}
           viewMode={viewMode}
           setViewMode={setViewMode}
           generateRandomSeed={generateRandomSeed}
@@ -275,8 +320,8 @@ const App = () => {
             </div>
           ) : (
             <>
-              {viewMode === 'table' ? (
-                <TableView 
+              {viewMode === "table" ? (
+                <TableView
                   songs={songs}
                   page={page}
                   handlePageChange={handlePageChange}
@@ -290,7 +335,7 @@ const App = () => {
                   getActiveLyricsIndex={getActiveLyricsIndex}
                 />
               ) : (
-                <GalleryView 
+                <GalleryView
                   songs={songs}
                   playingSongIndex={activeSong?.index}
                   isPlaying={isPlaying}
@@ -308,7 +353,7 @@ const App = () => {
       </div>
 
       {/* Floating Global Audio Player Bar */}
-      <PlayerBar 
+      <PlayerBar
         activeSong={activeSong}
         isPlaying={isPlaying}
         togglePlay={togglePlay}
