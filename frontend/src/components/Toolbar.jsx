@@ -5,12 +5,43 @@ const Toolbar = ({
   setSeed,
   likes,
   setLikes,
+  viewMode,
+  setViewMode,
   generateRandomSeed,
 }) => {
   return (
     <div className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-wrap gap-6 items-center justify-between shadow-lg">
-      {/* Language / Region Selection */}
+      {/* View Mode Switcher */}
       <div className="flex flex-col gap-1.5 min-w-[150px]">
+        <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+          Display Mode
+        </label>
+        <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-800">
+          <button
+            onClick={() => setViewMode("table")}
+            className={`flex-1 text-xs font-semibold px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+              viewMode === "table"
+                ? "bg-violet-600 text-white shadow"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            Table
+          </button>
+          <button
+            onClick={() => setViewMode("gallery")}
+            className={`flex-1 text-xs font-semibold px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+              viewMode === "gallery"
+                ? "bg-violet-600 text-white shadow"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            Gallery
+          </button>
+        </div>
+      </div>
+
+      {/* Language Selection */}
+      <div className="flex flex-col gap-1.5 min-w-[140px]">
         <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
           Language
         </label>
@@ -25,7 +56,7 @@ const Toolbar = ({
       </div>
 
       {/* Seed Configuration */}
-      <div className="flex flex-col gap-1.5 flex-1 min-w-[250px]">
+      <div className="flex flex-col gap-1.5 flex-1 min-w-[240px]">
         <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
           Seed Value
         </label>
@@ -34,12 +65,12 @@ const Toolbar = ({
             type="text"
             value={seed}
             onChange={(e) => setSeed(e.target.value)}
-            placeholder="Enter seed value"
+            placeholder="Enter seed"
             className="flex-1 bg-slate-950 text-slate-100 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-500 transition-colors"
           />
           <button
             onClick={generateRandomSeed}
-            className="bg-violet-600 hover:bg-violet-500 text-slate-100 font-medium text-sm px-4 py-2 rounded-lg transition-colors cursor-pointer"
+            className="bg-violet-600 hover:bg-violet-500 text-slate-100 font-medium text-sm px-3 py-2 rounded-lg transition-colors cursor-pointer"
           >
             Random
           </button>
@@ -47,7 +78,7 @@ const Toolbar = ({
       </div>
 
       {/* Likes Per Song Control */}
-      <div className="flex flex-col gap-1.5 min-w-[200px] flex-1">
+      <div className="flex flex-col gap-1.5 min-w-[180px] flex-1">
         <div className="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider">
           <span>Likes per Song</span>
           <span className="text-violet-400 font-bold normal-case text-sm">
