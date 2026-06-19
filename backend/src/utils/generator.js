@@ -1,117 +1,77 @@
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import seedrandom from "seedrandom";
 import { Faker, en, de } from "@faker-js/faker";
 
-// Review Template Data
-const REVIEW_TEMPLATES = {
-  en: [
-    "A brilliant fusion of modern synths and melodic storytelling.",
-    "This track offers an ethereal listening experience that stays with you.",
-    "A masterclass in music composition. The chord progression is absolutely stellar.",
-    "Perfect for late-night drives or ambient background work. Highly recommended!",
-    "An impressive production with rich textures and a catchy rhythm structure.",
-  ],
-  de: [
-    "Eine geniale Verschmelzung von modernen Synths und melodischer Erzählung.",
-    "Dieser Track bietet ein ätherisches Hörerlebnis, das im Gedächtnis bleibt.",
-    "Eine Meisterklasse der Musikkomposition. Die Akkordfolge ist absolut hervorragend.",
-    "Perfekt für nächtliche Fahrten oder entspanntes Arbeiten. Sehr zu empfehlen!",
-    "Eine beeindruckende Produktion mit satten Texturen und einer eingängigen Rhythmusstruktur.",
-  ],
+// Resolve current directory path in ES Modules (since __dirname is not available)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+/**
+ * Dynamically loads locale JSON datasets from external folder.
+ * Highly extensible - adding a new language requires zero JS changes.
+ */
+const loadLocaleDataset = (locale) => {
+  try {
+    const filePath = path.join(__dirname, `../locales/${locale}.json`);
+
+    // Check if the file exists before reading
+    if (fs.existsSync(filePath)) {
+      const rawData = fs.readFileSync(filePath, "utf8");
+      return JSON.parse(rawData);
+    }
+  } catch (error) {
+    console.error(`Failed to load locale file for ${locale}:`, error);
+  }
+
+  // Fallback to English if file is missing or corrupted
+  const fallbackPath = path.join(__dirname, "../locales/en.json");
+  const rawData = fs.readFileSync(fallbackPath, "utf8");
+  return JSON.parse(rawData);
 };
 
-// Lyrics Template Data
-const LYRICS_TEMPLATES = {
-  en: {
-    verses: [
-      [
-        "Walking down the digital line",
-        "Frequencies are aligned in time",
-        "A sound that makes you feel alive",
-        "We generate until the dawn",
-      ],
-      [
-        "Rhythms beating in my head",
-        "Synthesizers glowing bright",
-        "No database, just memory",
-        "Deterministic beat goes on",
-      ],
-      [
-        "Coded nights and electronic dreams",
-        "Searching for the perfect seed",
-        "Melodies floating in the air",
-        "Echoes of the sound we share",
-      ],
-    ],
-  },
-  de: {
-    verses: [
-      [
-        "Ich gehe den digitalen Weg",
-        "Frequenzen sind zeitlich abgestimmt",
-        "Ein Sound, der dich lebendig fühlen lässt",
-        "Wir generieren bis zum Morgengrauen",
-      ],
-      [
-        "Rhythmen schlagen in meinem Kopf",
-        "Synthesizer leuchten hell",
-        "Keine Datenbank, nur Speicher",
-        "Der deterministische Takt geht weiter",
-      ],
-      [
-        "Codierte Nächte und elektronische Träume",
-        "Auf der Suche nach dem perfekten Samen",
-        "Melodien schweben in der Luft",
-        "Echostimmen des Klangs, den wir teilen",
-      ],
-    ],
-  },
-};
-
-// Musical Scale Configuration (Pitches in MIDI values)
+// Musical Scales
 const SCALES = {
-  major: [60, 62, 64, 65, 67, 69, 71, 72], // C Major
-  minor: [57, 59, 60, 62, 64, 65, 67, 69], // A Minor
+  major: [60, 62, 64, 65, 67, 69, 71, 72],
+  minor: [57, 59, 60, 62, 64, 65, 67, 69],
 };
 
-// Chords corresponding to Scale positions (Triads)
+// Chord Triads
 const CHORDS = {
   major: [
-    [60, 64, 67], // C Major (I)
-    [65, 69, 72], // F Major (IV)
-    [67, 71, 74], // G Major (V)
-    [57, 60, 64], // A Minor (vi)
+    [60, 64, 67],
+    [65, 69, 72],
+    [67, 71, 74],
+    [57, 60, 64],
   ],
   minor: [
-    [57, 60, 64], // A Minor (i)
-    [62, 65, 69], // D Minor (iv)
-    [64, 67, 71], // E Minor (v)
-    [60, 64, 67], // C Major (III)
+    [57, 60, 64],
+    [62, 65, 69],
+    [64, 67, 71],
+    [60, 64, 67],
   ],
 };
 
 const calculateLikes = (rng, averageLikes) => {
   const integerPart = Math.floor(averageLikes);
   const fractionalPart = averageLikes - integerPart;
-
   const extraLike = rng() < fractionalPart ? 1 : 0;
-
   return integerPart + extraLike;
 };
 
 const generateArtistName = (faker, rng) => {
   const isBand = rng() < 0.4;
-
   if (isBand) {
     const prefix = faker.company.buzzAdjective();
     const noun = faker.company.buzzNoun();
-
     return `The ${prefix.charAt(0).toUpperCase() + prefix.slice(1)} ${noun.charAt(0).toUpperCase() + noun.slice(1)}s`;
   }
-
   return faker.person.fullName();
 };
 
 const generateCoverSvg = (title, artist, rng) => {
+  const cleanTitle = title.replace(/[^a-zA-Z0-9]/g, "");
   const hue1 = Math.floor(rng() * 360);
   const hue2 = (hue1 + 120 + Math.floor(rng() * 120)) % 360;
   const color1 = `hsl(${hue1}, 70%, 25%)`;
@@ -144,8 +104,6 @@ const generateCoverSvg = (title, artist, rng) => {
     }
   }
 
-  const cleanTitle = title.replace(/[^a-zA-Z0-9]/g, "");
-
   return `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="100%" height="100%">
       <defs>
@@ -173,36 +131,31 @@ const generateMusicTrack = (rng) => {
   const scale = SCALES[scaleType];
   const chordSet = CHORDS[scaleType];
 
-  const tempo = 90 + Math.floor(rng() * 40); // 90 to 130 BPM
+  const tempo = 90 + Math.floor(rng() * 40);
   const synthTypes = ["sine", "triangle", "sawtooth"];
   const synthType = synthTypes[Math.floor(rng() * synthTypes.length)];
 
   const melody = [];
   const beatsPerBar = 4;
   const totalBars = 4;
-  const totalBeats = beatsPerBar * totalBars;
 
-  // Generate melody notes fitting the chord structure of each bar
   for (let bar = 0; bar < totalBars; bar++) {
     const barStartBeat = bar * beatsPerBar;
-    const barChord = chordSet[bar % chordSet.length]; // chord progression
+    const barChord = chordSet[bar % chordSet.length];
 
-    // Generate up to 8 eighth notes per bar (half beat each)
     for (let step = 0; step < 8; step++) {
       const timeInBeat = barStartBeat + step * 0.5;
 
-      // 60% chance to play a note at this step
       if (rng() < 0.6) {
-        // Choose note from current chord (80% chance) or scale (20% chance)
         const chooseChordTone = rng() < 0.8;
         const noteMidi = chooseChordTone
           ? barChord[Math.floor(rng() * barChord.length)]
           : scale[Math.floor(rng() * scale.length)];
 
         melody.push({
-          midi: noteMidi + (rng() < 0.3 ? 12 : 0), // Occasional octave jump
+          midi: noteMidi + (rng() < 0.3 ? 12 : 0),
           time: timeInBeat,
-          duration: 0.4, // slightly shorter than 0.5 beat for staccato feel
+          duration: 0.4,
         });
       }
     }
@@ -215,13 +168,10 @@ const generateMusicTrack = (rng) => {
   };
 };
 
-const generateLyrics = (locale, rng) => {
-  const templates = LYRICS_TEMPLATES[locale] || LYRICS_TEMPLATES.en;
-  const verseIndex = Math.floor(rng() * templates.verses.length);
-  const selectedVerse = templates.verses[verseIndex];
+const generateLyrics = (dataset, rng) => {
+  const verseIndex = Math.floor(rng() * dataset.lyrics.length);
+  const selectedVerse = dataset.lyrics[verseIndex];
 
-  // Map each line of the verse to a specific beat time (4 beats per bar)
-  // bar 0 = beat 0, bar 1 = beat 4, bar 2 = beat 8, bar 3 = beat 12
   return [
     {
       time: 0,
@@ -245,9 +195,13 @@ export const generateSongsPage = (
   const songs = [];
   const startIdx = (page - 1) * limit;
 
+  // Load locale dataset dynamically from files
+  const dataset = loadLocaleDataset(locale);
+
   for (let i = 0; i < limit; i++) {
     const absoluteIndex = startIdx + i + 1;
 
+    // --- METADATA GENERATION ---
     const metadataSeed = `${globalSeed}_${absoluteIndex}_${locale}`;
     const metaRng = seedrandom(metadataSeed);
 
@@ -256,24 +210,24 @@ export const generateSongsPage = (
     });
 
     const numericSeed = Math.abs(metaRng.int32());
-
     fakerInstance.seed(numericSeed);
 
     const title = fakerInstance.music.songName();
     const artist = generateArtistName(fakerInstance, metaRng);
-
     const album = metaRng() < 0.3 ? "Single" : fakerInstance.music.album();
     const genre = fakerInstance.music.genre();
 
-    const reviews = REVIEW_TEMPLATES[locale] || REVIEW_TEMPLATES.en;
-    const reviewText = reviews[Math.floor(metaRng() * reviews.length)];
+    // Select review dynamically from loaded external dataset
+    const reviewText =
+      dataset.reviews[Math.floor(metaRng() * dataset.reviews.length)];
 
     const coverSvg = generateCoverSvg(title, artist, metaRng);
-
     const musicTrack = generateMusicTrack(metaRng);
 
-    const lyrics = generateLyrics(locale, metaRng);
+    // Select lyrics dynamically from loaded external dataset
+    const lyrics = generateLyrics(dataset, metaRng);
 
+    // --- LIKES GENERATION ---
     const likesSeed = `${globalSeed}_${absoluteIndex}_likes`;
     const likesRng = seedrandom(likesSeed);
     const likes = calculateLikes(likesRng, likesAverage);
