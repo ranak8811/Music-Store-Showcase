@@ -1,89 +1,189 @@
-let activeAudioContext = null;
+let ctx = null;
+let globalGainNode = null;
 let stopCallback = null;
 
-export const playMelody = (musicTrack, onFinished) => {
-  // Stop any currently playing audio track
+let isPlaying = false;
+let isPaused = false;
+
+let activeTrack = null;
+let playbackStartCtxTime = 0; // The ctx.currentTime when playback started/resumed
+let pausedTimeOffset = 0; // Elapsed time in seconds before pausing
+let activeOscillators = [];
+let progressIntervalId = null;
+
+/**
+ * Converts MIDI note to Frequency
+ */
+const mToF = (midi) => 440 * Math.pow(2, (midi - 69) / 12);
+
+/**
+ * Plays the track from a specific offset in seconds.
+ */
+export const playMelody = (
+  musicTrack,
+  offsetSeconds = 0,
+  onProgress,
+  onFinished,
+) => {
   stopMelody();
 
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContextClass) {
-    alert("Web Audio API is not supported in this browser.");
-    return;
-  }
+  if (!AudioContextClass) return;
 
-  const ctx = new AudioContextClass();
-  activeAudioContext = ctx;
+  ctx = new AudioContextClass();
+
+  // Set up global volume gain node
+  globalGainNode = ctx.createGain();
+  globalGainNode.gain.value = 0.5; // Default 50% volume
+  globalGainNode.connect(ctx.destination);
+
+  activeTrack = musicTrack;
+  isPlaying = true;
+  isPaused = false;
 
   const tempo = musicTrack.tempo;
-  const beatDuration = 60 / tempo; // Duration of one beat in seconds
-  const synthType = musicTrack.synthType || "sine";
+  const beatDuration = 60 / tempo;
+  const totalBeats = 16.5; // Outro finishes around beat 16.5
+  const totalDuration = totalBeats * beatDuration;
 
-  let maxTime = 0;
+  // Record playback timeline details
+  pausedTimeOffset = offsetSeconds;
+  playbackStartCtxTime = ctx.currentTime - offsetSeconds;
 
-  // Schedule each note on the AudioContext timeline
+  activeOscillators = [];
+
+  // Schedule notes
   musicTrack.melody.forEach((note) => {
-    const osc = ctx.createOscillator();
-    const gainNode = ctx.createGain();
+    const noteStartTime = note.time * beatDuration;
+    const noteEndTime = (note.time + note.duration) * beatDuration;
 
-    osc.type = synthType;
+    // Check if note overlaps with current offset playback window
+    if (noteEndTime > offsetSeconds) {
+      const osc = ctx.createOscillator();
+      const noteGain = ctx.createGain();
 
-    // MIDI pitch to frequency formula: f = 440 * 2^((d-69)/12)
-    const frequency = 440 * Math.pow(2, (note.midi - 69) / 12);
-    osc.frequency.setValueAtTime(
-      frequency,
-      ctx.currentTime + note.time * beatDuration,
-    );
+      osc.type = musicTrack.synthType || "sine";
+      osc.frequency.setValueAtTime(mToF(note.midi), ctx.currentTime);
 
-    // Apply ADS (Attack-Decay-Sustain) Volume Envelope to prevent popping sounds
-    gainNode.gain.setValueAtTime(0, ctx.currentTime + note.time * beatDuration);
-    gainNode.gain.linearRampToValueAtTime(
-      0.15,
-      ctx.currentTime + note.time * beatDuration + 0.04,
-    );
-    gainNode.gain.exponentialRampToValueAtTime(
-      0.001,
-      ctx.currentTime + (note.time + note.duration) * beatDuration,
-    );
+      // Volume Envelope
+      noteGain.gain.setValueAtTime(0, ctx.currentTime);
 
-    osc.connect(gainNode);
-    gainNode.connect(ctx.destination);
+      const delay = Math.max(0, noteStartTime - offsetSeconds);
+      const scheduleStart = ctx.currentTime + delay;
+      const scheduleEnd = ctx.currentTime + (noteEndTime - offsetSeconds);
 
-    // Schedule start and stop on the hardware timer
-    osc.start(ctx.currentTime + note.time * beatDuration);
-    osc.stop(ctx.currentTime + (note.time + note.duration) * beatDuration);
+      // Attack phase (prevent click noises)
+      noteGain.gain.setValueAtTime(0, scheduleStart);
+      noteGain.gain.linearRampToValueAtTime(
+        0.2,
+        scheduleStart + Math.min(0.04, (note.duration * beatDuration) / 2),
+      );
 
-    const noteEndTime = note.time + note.duration;
-    if (noteEndTime > maxTime) {
-      maxTime = noteEndTime;
+      // Decay phase
+      noteGain.gain.exponentialRampToValueAtTime(0.001, scheduleEnd);
+
+      osc.connect(noteGain);
+      noteGain.connect(globalGainNode);
+
+      osc.start(scheduleStart);
+      osc.stop(scheduleEnd);
+
+      activeOscillators.push(osc);
     }
   });
 
-  // Automatically clean up context and fire callback when song ends
-  const timeoutId = setTimeout(
-    () => {
+  // Start progress updater loop
+  if (progressIntervalId) clearInterval(progressIntervalId);
+  progressIntervalId = setInterval(() => {
+    if (!ctx || ctx.state === "closed") return;
+    const elapsed = ctx.currentTime - playbackStartCtxTime;
+
+    if (elapsed >= totalDuration) {
       stopMelody();
-      onFinished();
-    },
-    maxTime * beatDuration * 1000,
-  );
+      if (onFinished) onFinished();
+    } else {
+      if (onProgress) onProgress(elapsed, totalDuration);
+    }
+  }, 100);
 
   stopCallback = () => {
-    clearTimeout(timeoutId);
-    if (ctx.state !== "closed") {
+    if (progressIntervalId) {
+      clearInterval(progressIntervalId);
+      progressIntervalId = null;
+    }
+    activeOscillators.forEach((osc) => {
+      try {
+        osc.stop();
+      } catch (e) {}
+    });
+    activeOscillators = [];
+    if (ctx && ctx.state !== "closed") {
       ctx.close();
     }
+    ctx = null;
+    globalGainNode = null;
+    isPlaying = false;
+    isPaused = false;
   };
 
   return stopCallback;
 };
 
-/**
- * Stops any playing synth audio.
- */
+export const pauseMelody = () => {
+  if (!isPlaying || isPaused || !ctx) return 0;
+
+  // Calculate elapsed time before freezing
+  const elapsed = ctx.currentTime - playbackStartCtxTime;
+  pausedTimeOffset = elapsed;
+  isPaused = true;
+
+  // Stop active oscillator nodes
+  activeOscillators.forEach((osc) => {
+    try {
+      osc.stop();
+    } catch (e) {}
+  });
+  activeOscillators = [];
+
+  if (progressIntervalId) {
+    clearInterval(progressIntervalId);
+    progressIntervalId = null;
+  }
+
+  if (ctx && ctx.state !== "closed") {
+    ctx.close();
+  }
+  ctx = null;
+  globalGainNode = null;
+
+  return pausedTimeOffset;
+};
+
 export const stopMelody = () => {
   if (stopCallback) {
     stopCallback();
     stopCallback = null;
-    activeAudioContext = null;
+  }
+  pausedTimeOffset = 0;
+  playbackStartCtxTime = 0;
+  activeTrack = null;
+};
+
+export const setVolume = (volume) => {
+  if (globalGainNode) {
+    globalGainNode.gain.setValueAtTime(volume, ctx ? ctx.currentTime : 0);
+  }
+};
+
+export const changeSynthType = (type) => {
+  if (activeTrack) {
+    activeTrack.synthType = type;
+    // To apply changes immediately, we restart at the current elapsed offset!
+    if (isPlaying && !isPaused && ctx) {
+      const elapsed = ctx.currentTime - playbackStartCtxTime;
+      const progressCb = window.__audioProgressCb;
+      const finishedCb = window.__audioFinishedCb;
+      playMelody(activeTrack, elapsed, progressCb, finishedCb);
+    }
   }
 };
