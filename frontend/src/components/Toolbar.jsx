@@ -13,6 +13,8 @@ const Toolbar = ({
   setLikesError,
   viewMode,
   setViewMode,
+  exporting,
+  handleExport,
   generateRandomSeed,
 }) => {
   return (
@@ -83,12 +85,12 @@ const Toolbar = ({
         </div>
       </div>
 
-      {/* Likes Per Song - Advanced Validation Controls */}
+      {/* Likes Per Song Control */}
       <div className="flex flex-col gap-1.5 min-w-[240px] flex-1">
         <div className="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider">
           <span>Likes per Song</span>
           {likesError ? (
-            <span className="text-red-400 font-bold lowercase text-xs animate-pulse">
+            <span className="text-red-400 font-bold lowercase text-xs">
               ⚠️ {likesError}
             </span>
           ) : (
@@ -99,7 +101,6 @@ const Toolbar = ({
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Slider: bounded by safe values */}
           <input
             type="range"
             min="0"
@@ -110,12 +111,10 @@ const Toolbar = ({
               const val = parseFloat(e.target.value);
               setLikes(val);
               setLikesInput(e.target.value);
-              setLikesError(""); // Clear errors when slider changes
+              setLikesError("");
             }}
             className="flex-1 accent-violet-600 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer"
           />
-
-          {/* Precision Input Box: handles custom typing */}
           <input
             type="text"
             value={likesInput}
@@ -123,20 +122,17 @@ const Toolbar = ({
               const valString = e.target.value;
               setLikesInput(valString);
 
-              // 1. Check if blank
               if (valString.trim() === "") {
                 setLikesError("Cannot be blank");
                 return;
               }
 
-              // 2. Parse and validate number
               const num = parseFloat(valString);
               if (isNaN(num)) {
                 setLikesError("Must be a number");
               } else if (num < 0 || num > 10) {
                 setLikesError("Must be 0 to 10");
               } else {
-                // Clear errors and propagate state
                 setLikesError("");
                 setLikes(num);
               }
@@ -148,6 +144,44 @@ const Toolbar = ({
             }`}
           />
         </div>
+      </div>
+
+      {/* Export ZIP Button */}
+      <div className="flex flex-col gap-1.5 justify-end">
+        <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+          Export
+        </label>
+        <button
+          onClick={handleExport}
+          disabled={exporting || !!likesError}
+          className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600 text-slate-100 font-bold text-xs px-4 py-2.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
+        >
+          {exporting ? (
+            <>
+              {/* Spinner icon when building ZIP */}
+              <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              Zipping...
+            </>
+          ) : (
+            <>
+              {/* Download Icon */}
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+                />
+              </svg>
+              Export ZIP
+            </>
+          )}
+        </button>
       </div>
     </div>
   );

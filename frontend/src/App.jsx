@@ -16,12 +16,9 @@ const App = () => {
   // 1. Toolbar State
   const [locale, setLocale] = useState("en");
   const [seed, setSeed] = useState("42");
-
-  // Advanced Likes Input Validation States
   const [likes, setLikes] = useState(3.7);
   const [likesInput, setLikesInput] = useState("3.7");
   const [likesError, setLikesError] = useState("");
-
   const [viewMode, setViewMode] = useState("table");
 
   // 2. Pagination State
@@ -31,7 +28,10 @@ const App = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
 
-  // 3. Audio Player Master States
+  // 3. Export Loading State
+  const [exporting, setExporting] = useState(false);
+
+  // 4. Audio Player Master States
   const [activeSong, setActiveSong] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioProgress, setAudioProgress] = useState(0);
@@ -39,10 +39,10 @@ const App = () => {
   const [volume, setVolumeState] = useState(0.5);
   const [synth, setSynthState] = useState("sine");
 
-  // 4. Set row expansion
+  // 5. Set row expansion
   const [expandedRows, setExpandedRows] = useState(new Set());
 
-  // 5. DOM References
+  // 6. DOM References
   const loadMoreRef = useRef(null);
   const lyricsContainerRefs = useRef({});
 
@@ -101,9 +101,9 @@ const App = () => {
     [seed, locale, likes],
   );
 
-  // Sync inputs and trigger API calls ONLY if validation passes
+  // Sync inputs and trigger API calls
   useEffect(() => {
-    if (likesError) return; // LOCK API: Prevent fetch requests with invalid inputs!
+    if (likesError) return;
 
     setPage(1);
     stopActiveAudio();
@@ -118,6 +118,44 @@ const App = () => {
       stopMelody();
     };
   }, []);
+
+  // Trigger ZIP Export and Dynamic Download Link
+  const handleExport = async () => {
+    if (likesError) return;
+    setExporting(true);
+    setError("");
+
+    try {
+      // 1. Trigger API with responseType set to blob
+      const response = await api.get("/songs/export", {
+        params: { seed, page, locale, likes },
+        responseType: "blob", // Critical to handle binary data
+      });
+
+      // 2. Create local browser blob URL representation
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
+
+      // 3. Create dummy DOM link and trigger virtual click
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.setAttribute(
+        "download",
+        `music_showcase_seed_${seed}_page_${page}.zip`,
+      );
+      document.body.appendChild(link);
+
+      link.click(); // Trigger browser download dialog
+
+      // 4. Cleanup dummy DOM and revoke resource memory
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Export failed:", err);
+      setError("Failed to download ZIP archive. Try again.");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // Find active lyric index by playback beat
   const getActiveLyricsIndex = (song, progressSec) => {
@@ -229,7 +267,6 @@ const App = () => {
     setExpandedRows(newExpandedRows);
   };
 
-  // Sync state update inside callback
   const generateRandomSeed = useCallback(() => {
     const randomSeedVal = Math.floor(
       Math.random() * Number.MAX_SAFE_INTEGER,
@@ -243,9 +280,9 @@ const App = () => {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  // Infinite Scroll Trigger (Gallery Mode)
+  // Infinite Scroll Trigger
   useEffect(() => {
-    if (viewMode !== "gallery" || loading || loadingMore || likesError) return; // Prevent load more on error
+    if (viewMode !== "gallery" || loading || loadingMore || likesError) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -302,6 +339,8 @@ const App = () => {
           setLikesError={setLikesError}
           viewMode={viewMode}
           setViewMode={setViewMode}
+          exporting={exporting}
+          handleExport={handleExport}
           generateRandomSeed={generateRandomSeed}
         />
 
