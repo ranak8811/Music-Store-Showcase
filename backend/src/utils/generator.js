@@ -81,55 +81,19 @@ const generateArtistName = (dataset, fakerInstance, rng) => {
   return resolveTemplate(template, dataset, fakerInstance);
 };
 
-const generateCoverSvg = (title, artist, rng) => {
-  const cleanTitle = title.replace(/[^a-zA-Z0-9]/g, "");
-  const hue1 = Math.floor(rng() * 360);
-  const hue2 = (hue1 + 120 + Math.floor(rng() * 120)) % 360;
-  const color1 = `hsl(${hue1}, 70%, 25%)`;
-  const color2 = `hsl(${hue2}, 70%, 12%)`;
-
-  const patternType = Math.floor(rng() * 3);
-  let shapes = "";
-  if (patternType === 0) {
-    for (let i = 0; i < 5; i++) {
-      const cx = Math.floor(rng() * 300);
-      const cy = Math.floor(rng() * 300);
-      const r = 30 + Math.floor(rng() * 80);
-      shapes += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="white" opacity="0.05" />`;
-    }
-  } else if (patternType === 1) {
-    for (let i = 0; i < 8; i++) {
-      const x1 = Math.floor(rng() * 300);
-      const y1 = Math.floor(rng() * 300);
-      const x2 = Math.floor(rng() * 300);
-      const y2 = Math.floor(rng() * 300);
-      shapes += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="white" stroke-width="2" opacity="0.06" />`;
-    }
-  } else {
-    for (let i = 0; i < 4; i++) {
-      const x = Math.floor(rng() * 200);
-      const y = Math.floor(rng() * 200);
-      const w = 40 + Math.floor(rng() * 100);
-      const h = 40 + Math.floor(rng() * 100);
-      shapes += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10" fill="white" opacity="0.04" />`;
-    }
-  }
+const generateCoverSvg = (title, artist, photoId, rng) => {
+  const imageUrl = `https://images.unsplash.com/photo-${photoId}?auto=format&fit=crop&w=300&h=300&q=80`;
 
   return `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="100%" height="100%">
-      <defs>
-        <linearGradient id="grad-${cleanTitle}" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" style="stop-color:${color1};stop-opacity:1" />
-          <stop offset="100%" style="stop-color:${color2};stop-opacity:1" />
-        </linearGradient>
-      </defs>
-      <rect width="100%" height="100%" fill="url(#grad-${cleanTitle})" />
-      ${shapes}
-      <rect x="15" y="15" width="270" height="270" fill="none" stroke="white" stroke-width="1" opacity="0.15" />
-      <text x="50%" y="45%" dominant-baseline="middle" text-anchor="middle" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="bold" opacity="0.9">
+      <rect width="100%" height="100%" fill="#0f172a" />
+      <image href="${imageUrl}" x="0" y="0" width="300" height="300" preserveAspectRatio="xMidYMid slice" />
+      <rect x="0" y="0" width="300" height="300" fill="black" opacity="0.45" />
+      <rect x="15" y="15" width="270" height="270" fill="none" stroke="white" stroke-width="1" opacity="0.25" />
+      <text x="50%" y="45%" dominant-baseline="middle" text-anchor="middle" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="bold" opacity="0.95">
         ${title}
       </text>
-      <text x="50%" y="60%" dominant-baseline="middle" text-anchor="middle" fill="#cbd5e1" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="medium" opacity="0.75">
+      <text x="50%" y="60%" dominant-baseline="middle" text-anchor="middle" fill="#cbd5e1" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="medium" opacity="0.85">
         ${artist}
       </text>
     </svg>
@@ -240,7 +204,8 @@ export const generateSongsPage = (
 
     const reviewText = fakerInstance.helpers.arrayElement(dataset.reviews);
 
-    const coverSvg = generateCoverSvg(title, artist, metaRng);
+    const photoId = fakerInstance.helpers.arrayElement(dataset.unsplashPhotoIds);
+    const coverSvg = generateCoverSvg(title, artist, photoId, metaRng);
     const musicTrack = generateMusicTrack(metaRng);
 
     const lyrics = generateLyrics(dataset, fakerInstance);
