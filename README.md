@@ -14,7 +14,7 @@ A high-performance, single-page monorepo web application that simulates a music 
 
 ## 🔗 Live Deployments
 
-- **⚡ Frontend (Netlify SPA):** [https://spectacular-biscotti-b54d5c.netlify.app](https://spectacular-biscotti-b54d5c.netlify.app)
+- **⚡ Frontend (Netlify SPA):** [https://music-store-showcase.netlify.app](https://music-store-showcase.netlify.app)
 
 ---
 
