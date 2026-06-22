@@ -4,19 +4,12 @@ import { fileURLToPath } from "url";
 import seedrandom from "seedrandom";
 import { Faker, en, de } from "@faker-js/faker";
 
-// Resolve current directory path in ES Modules (since __dirname is not available)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/**
- * Dynamically loads locale JSON datasets from external folder.
- * Highly extensible - adding a new language requires zero JS changes.
- */
 const loadLocaleDataset = (locale) => {
   try {
     const filePath = path.join(__dirname, `../locales/${locale}.json`);
-
-    // Check if the file exists before reading
     if (fs.existsSync(filePath)) {
       const rawData = fs.readFileSync(filePath, "utf8");
       return JSON.parse(rawData);
@@ -25,7 +18,6 @@ const loadLocaleDataset = (locale) => {
     console.error(`Failed to load locale file for ${locale}:`, error);
   }
 
-  // Fallback to English if file is missing or corrupted
   const fallbackPath = path.join(__dirname, "../locales/en.json");
   const rawData = fs.readFileSync(fallbackPath, "utf8");
   return JSON.parse(rawData);
@@ -60,14 +52,33 @@ const calculateLikes = (rng, averageLikes) => {
   return integerPart + extraLike;
 };
 
-const generateArtistName = (faker, rng) => {
-  const isBand = rng() < 0.4;
-  if (isBand) {
-    const prefix = faker.company.buzzAdjective();
-    const noun = faker.company.buzzNoun();
-    return `The ${prefix.charAt(0).toUpperCase() + prefix.slice(1)} ${noun.charAt(0).toUpperCase() + noun.slice(1)}s`;
+const resolveTemplate = (template, dataset, fakerInstance) => {
+  let result = template;
+  const maxIterations = 5;
+  let iterations = 0;
+  while (
+    result.includes("{") &&
+    result.includes("}") &&
+    iterations < maxIterations
+  ) {
+    iterations++;
+    result = result.replace(/\{([a-zA-Z]+)\}/g, (match, key) => {
+      const list = dataset[key];
+      if (list && list.length > 0) {
+        return fakerInstance.helpers.arrayElement(list);
+      }
+      return match;
+    });
   }
-  return faker.person.fullName();
+  return result;
+};
+
+const generateArtistName = (dataset, fakerInstance, rng) => {
+  const isBand = rng() < 0.4;
+  const template = isBand
+    ? fakerInstance.helpers.arrayElement(dataset.bandArtistTemplates)
+    : fakerInstance.helpers.arrayElement(dataset.personalArtistTemplates);
+  return resolveTemplate(template, dataset, fakerInstance);
 };
 
 const generateCoverSvg = (title, artist, rng) => {
@@ -168,9 +179,8 @@ const generateMusicTrack = (rng) => {
   };
 };
 
-const generateLyrics = (dataset, rng) => {
-  const verseIndex = Math.floor(rng() * dataset.lyrics.length);
-  const selectedVerse = dataset.lyrics[verseIndex];
+const generateLyrics = (dataset, fakerInstance) => {
+  const selectedVerse = fakerInstance.helpers.arrayElement(dataset.lyrics);
 
   return [
     {
@@ -195,13 +205,11 @@ export const generateSongsPage = (
   const songs = [];
   const startIdx = (page - 1) * limit;
 
-  // Load locale dataset dynamically from files
   const dataset = loadLocaleDataset(locale);
 
   for (let i = 0; i < limit; i++) {
     const absoluteIndex = startIdx + i + 1;
 
-    // --- METADATA GENERATION ---
     const metadataSeed = `${globalSeed}_${absoluteIndex}_${locale}`;
     const metaRng = seedrandom(metadataSeed);
 
@@ -212,22 +220,31 @@ export const generateSongsPage = (
     const numericSeed = Math.abs(metaRng.int32());
     fakerInstance.seed(numericSeed);
 
-    const title = fakerInstance.music.songName();
-    const artist = generateArtistName(fakerInstance, metaRng);
-    const album = metaRng() < 0.3 ? "Single" : fakerInstance.music.album();
-    const genre = fakerInstance.music.genre();
+    const titleTemplate = fakerInstance.helpers.arrayElement(
+      dataset.songTemplates,
+    );
+    const title = resolveTemplate(titleTemplate, dataset, fakerInstance);
 
-    // Select review dynamically from loaded external dataset
-    const reviewText =
-      dataset.reviews[Math.floor(metaRng() * dataset.reviews.length)];
+    const artist = generateArtistName(dataset, fakerInstance, metaRng);
+
+    const album =
+      metaRng() < 0.3
+        ? "Single"
+        : resolveTemplate(
+            fakerInstance.helpers.arrayElement(dataset.albumTemplates),
+            dataset,
+            fakerInstance,
+          );
+
+    const genre = fakerInstance.helpers.arrayElement(dataset.genres);
+
+    const reviewText = fakerInstance.helpers.arrayElement(dataset.reviews);
 
     const coverSvg = generateCoverSvg(title, artist, metaRng);
     const musicTrack = generateMusicTrack(metaRng);
 
-    // Select lyrics dynamically from loaded external dataset
-    const lyrics = generateLyrics(dataset, metaRng);
+    const lyrics = generateLyrics(dataset, fakerInstance);
 
-    // --- LIKES GENERATION ---
     const likesSeed = `${globalSeed}_${absoluteIndex}_likes`;
     const likesRng = seedrandom(likesSeed);
     const likes = calculateLikes(likesRng, likesAverage);

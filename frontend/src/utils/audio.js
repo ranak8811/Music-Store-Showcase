@@ -6,19 +6,14 @@ let isPlaying = false;
 let isPaused = false;
 
 let activeTrack = null;
-let playbackStartCtxTime = 0; // The ctx.currentTime when playback started/resumed
-let pausedTimeOffset = 0; // Elapsed time in seconds before pausing
+let playbackStartCtxTime = 0;
+let pausedTimeOffset = 0;
 let activeOscillators = [];
 let progressIntervalId = null;
 
-/**
- * Converts MIDI note to Frequency
- */
+
 const mToF = (midi) => 440 * Math.pow(2, (midi - 69) / 12);
 
-/**
- * Plays the track from a specific offset in seconds.
- */
 export const playMelody = (
   musicTrack,
   offsetSeconds = 0,
@@ -32,9 +27,8 @@ export const playMelody = (
 
   ctx = new AudioContextClass();
 
-  // Set up global volume gain node
   globalGainNode = ctx.createGain();
-  globalGainNode.gain.value = 0.5; // Default 50% volume
+  globalGainNode.gain.value = 0.5;
   globalGainNode.connect(ctx.destination);
 
   activeTrack = musicTrack;
@@ -43,21 +37,19 @@ export const playMelody = (
 
   const tempo = musicTrack.tempo;
   const beatDuration = 60 / tempo;
-  const totalBeats = 16.5; // Outro finishes around beat 16.5
+  const totalBeats = 16.5;
   const totalDuration = totalBeats * beatDuration;
 
-  // Record playback timeline details
+
   pausedTimeOffset = offsetSeconds;
   playbackStartCtxTime = ctx.currentTime - offsetSeconds;
 
   activeOscillators = [];
 
-  // Schedule notes
+
   musicTrack.melody.forEach((note) => {
     const noteStartTime = note.time * beatDuration;
     const noteEndTime = (note.time + note.duration) * beatDuration;
-
-    // Check if note overlaps with current offset playback window
     if (noteEndTime > offsetSeconds) {
       const osc = ctx.createOscillator();
       const noteGain = ctx.createGain();
@@ -65,21 +57,20 @@ export const playMelody = (
       osc.type = musicTrack.synthType || "sine";
       osc.frequency.setValueAtTime(mToF(note.midi), ctx.currentTime);
 
-      // Volume Envelope
+
       noteGain.gain.setValueAtTime(0, ctx.currentTime);
 
       const delay = Math.max(0, noteStartTime - offsetSeconds);
       const scheduleStart = ctx.currentTime + delay;
       const scheduleEnd = ctx.currentTime + (noteEndTime - offsetSeconds);
 
-      // Attack phase (prevent click noises)
+
       noteGain.gain.setValueAtTime(0, scheduleStart);
       noteGain.gain.linearRampToValueAtTime(
         0.2,
         scheduleStart + Math.min(0.04, (note.duration * beatDuration) / 2),
       );
 
-      // Decay phase
       noteGain.gain.exponentialRampToValueAtTime(0.001, scheduleEnd);
 
       osc.connect(noteGain);
@@ -92,7 +83,7 @@ export const playMelody = (
     }
   });
 
-  // Start progress updater loop
+
   if (progressIntervalId) clearInterval(progressIntervalId);
   progressIntervalId = setInterval(() => {
     if (!ctx || ctx.state === "closed") return;
@@ -114,7 +105,9 @@ export const playMelody = (
     activeOscillators.forEach((osc) => {
       try {
         osc.stop();
-      } catch (e) {}
+      } catch (e) {
+        console.warn("Oscillator stop failed: ", e);
+      }
     });
     activeOscillators = [];
     if (ctx && ctx.state !== "closed") {
@@ -132,16 +125,18 @@ export const playMelody = (
 export const pauseMelody = () => {
   if (!isPlaying || isPaused || !ctx) return 0;
 
-  // Calculate elapsed time before freezing
+
   const elapsed = ctx.currentTime - playbackStartCtxTime;
   pausedTimeOffset = elapsed;
   isPaused = true;
 
-  // Stop active oscillator nodes
+
   activeOscillators.forEach((osc) => {
     try {
       osc.stop();
-    } catch (e) {}
+    } catch (e) {
+      console.warn("Oscillator stop failed: ", e);
+    }
   });
   activeOscillators = [];
 
@@ -178,7 +173,7 @@ export const setVolume = (volume) => {
 export const changeSynthType = (type) => {
   if (activeTrack) {
     activeTrack.synthType = type;
-    // To apply changes immediately, we restart at the current elapsed offset!
+
     if (isPlaying && !isPaused && ctx) {
       const elapsed = ctx.currentTime - playbackStartCtxTime;
       const progressCb = window.__audioProgressCb;

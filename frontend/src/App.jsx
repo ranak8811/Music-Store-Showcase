@@ -45,6 +45,8 @@ const App = () => {
   // 6. DOM References
   const loadMoreRef = useRef(null);
   const lyricsContainerRefs = useRef({});
+  const pageRef = useRef(1);
+  const loadingRef = useRef(false);
 
   // Helper: Stop Active Audio
   const stopActiveAudio = useCallback(() => {
@@ -72,9 +74,11 @@ const App = () => {
     };
   }, []);
 
-  // Fetch API Controller
+
   const loadSongs = useCallback(
     async (targetPage, shouldAppend) => {
+      if (loadingRef.current) return;
+      loadingRef.current = true;
       if (targetPage === 1) {
         setLoading(true);
       } else {
@@ -87,7 +91,12 @@ const App = () => {
           params: { seed, page: targetPage, locale, likes },
         });
         const newSongs = response.data.songs;
-        setSongs((prev) => (shouldAppend ? [...prev, ...newSongs] : newSongs));
+        setSongs((prev) => {
+          if (!shouldAppend) return newSongs;
+          const existingIds = new Set(prev.map((s) => s.index));
+          const filteredNewSongs = newSongs.filter((s) => !existingIds.has(s.index));
+          return [...prev, ...filteredNewSongs];
+        });
       } catch (err) {
         console.error(err);
         setError(
@@ -96,46 +105,49 @@ const App = () => {
       } finally {
         setLoading(false);
         setLoadingMore(false);
+        loadingRef.current = false;
       }
     },
     [seed, locale, likes],
   );
 
-  // Sync inputs and trigger API calls
+
   useEffect(() => {
     if (likesError) return;
 
     setPage(1);
+    pageRef.current = 1;
+    loadingRef.current = false;
     stopActiveAudio();
     setExpandedRows(new Set());
     loadSongs(1, false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [seed, locale, likes, viewMode, likesError]);
 
-  // Clean up audio on page exit
+
   useEffect(() => {
     return () => {
       stopMelody();
     };
   }, []);
 
-  // Trigger ZIP Export and Dynamic Download Link
+
   const handleExport = async () => {
     if (likesError) return;
     setExporting(true);
     setError("");
 
     try {
-      // 1. Trigger API with responseType set to blob
+
       const response = await api.get("/songs/export", {
         params: { seed, page, locale, likes },
-        responseType: "blob", // Critical to handle binary data
+        responseType: "blob",
       });
 
-      // 2. Create local browser blob URL representation
+
       const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
 
-      // 3. Create dummy DOM link and trigger virtual click
+
       const link = document.createElement("a");
       link.href = blobUrl;
       link.setAttribute(
@@ -144,9 +156,8 @@ const App = () => {
       );
       document.body.appendChild(link);
 
-      link.click(); // Trigger browser download dialog
+      link.click();
 
-      // 4. Cleanup dummy DOM and revoke resource memory
       link.parentNode.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
     } catch (err) {
@@ -157,7 +168,7 @@ const App = () => {
     }
   };
 
-  // Find active lyric index by playback beat
+
   const getActiveLyricsIndex = (song, progressSec) => {
     if (!song || !song.musicTrack) return -1;
     const beatDuration = 60 / song.musicTrack.tempo;
@@ -172,7 +183,7 @@ const App = () => {
     return activeIndex;
   };
 
-  // Auto Scroll Lyrics
+
   useEffect(() => {
     if (!activeSong) return;
     const activeIdx = getActiveLyricsIndex(activeSong, audioProgress);
@@ -193,7 +204,7 @@ const App = () => {
     }
   }, [audioProgress, activeSong]);
 
-  // Play/Pause toggle
+
   const togglePlay = (song) => {
     if (activeSong && activeSong.index === song.index) {
       if (isPlaying) {
@@ -224,7 +235,7 @@ const App = () => {
     }
   };
 
-  // Progress Seek (Jump offset)
+
   const handleSeek = (e) => {
     if (!activeSong) return;
     const newOffset = parseFloat(e.target.value);
@@ -280,18 +291,18 @@ const App = () => {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  // Infinite Scroll Trigger
+
   useEffect(() => {
     if (viewMode !== "gallery" || loading || loadingMore || likesError) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) {
-          setPage((prevPage) => {
-            const nextPage = prevPage + 1;
-            loadSongs(nextPage, true);
-            return nextPage;
-          });
+          if (loadingRef.current) return;
+          const nextPage = pageRef.current + 1;
+          pageRef.current = nextPage;
+          setPage(nextPage);
+          loadSongs(nextPage, true);
         }
       },
       {
@@ -315,7 +326,7 @@ const App = () => {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col items-center p-6 pb-36">
       <div className="w-full max-w-5xl flex flex-col gap-6">
-        {/* Header */}
+
         <header className="text-center mt-4">
           <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent sm:text-5xl">
             Music Store Showcase
@@ -325,7 +336,7 @@ const App = () => {
           </p>
         </header>
 
-        {/* Toolbar */}
+
         <Toolbar
           locale={locale}
           setLocale={setLocale}
@@ -344,14 +355,14 @@ const App = () => {
           generateRandomSeed={generateRandomSeed}
         />
 
-        {/* Error Alert */}
+
         {error && (
           <div className="bg-red-950/40 border border-red-900 text-red-400 px-4 py-3 rounded-lg text-sm text-center">
             {error}
           </div>
         )}
 
-        {/* Subcomponents Rendering */}
+
         <main className="w-full">
           {loading ? (
             <div className="text-center text-slate-400 py-24 animate-pulse">
@@ -391,7 +402,7 @@ const App = () => {
         </main>
       </div>
 
-      {/* Floating Global Audio Player Bar */}
+
       <PlayerBar
         activeSong={activeSong}
         isPlaying={isPlaying}

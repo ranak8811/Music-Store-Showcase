@@ -1,5 +1,3 @@
-import React from "react";
-
 const Toolbar = ({
   locale,
   setLocale,
@@ -19,7 +17,6 @@ const Toolbar = ({
 }) => {
   return (
     <div className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-wrap gap-6 items-center justify-between shadow-lg">
-      {/* Display Mode Selection */}
       <div className="flex flex-col gap-1.5 min-w-[150px]">
         <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
           Display Mode
@@ -48,7 +45,6 @@ const Toolbar = ({
         </div>
       </div>
 
-      {/* Language Selection */}
       <div className="flex flex-col gap-1.5 min-w-[140px]">
         <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
           Language
@@ -63,7 +59,6 @@ const Toolbar = ({
         </select>
       </div>
 
-      {/* Seed Configuration */}
       <div className="flex flex-col gap-1.5 flex-1 min-w-[240px]">
         <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
           Seed Value
@@ -85,7 +80,6 @@ const Toolbar = ({
         </div>
       </div>
 
-      {/* Likes Per Song Control */}
       <div className="flex flex-col gap-1.5 min-w-[240px] flex-1">
         <div className="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider">
           <span>Likes per Song</span>
@@ -146,7 +140,6 @@ const Toolbar = ({
         </div>
       </div>
 
-      {/* Export ZIP Button */}
       <div className="flex flex-col gap-1.5 justify-end">
         <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
           Export
@@ -158,13 +151,11 @@ const Toolbar = ({
         >
           {exporting ? (
             <>
-              {/* Spinner icon when building ZIP */}
               <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
               Zipping...
             </>
           ) : (
             <>
-              {/* Download Icon */}
               <svg
                 className="w-3.5 h-3.5"
                 fill="none"
